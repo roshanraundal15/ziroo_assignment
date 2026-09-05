@@ -61,24 +61,6 @@ So I kept the transport simple on purpose.
 
 ---
 
-## Setup
-
-### 1. Backend
-
-```bash
-cd backend
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
-
-pip install -r requirements.txt
-copy .env.example .env
-# Mac/Linux:
-# cp .env.example .env
 
 ## Setup
 
