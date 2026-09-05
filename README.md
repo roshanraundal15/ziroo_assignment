@@ -1,16 +1,84 @@
 # Ziroo Assignment — Multiplayer Room with an AI Participant
 
-Shared chat room where two people can talk at the same time, and an AI agent sits in the room as a third participant. The agent only replies when someone writes `@agent ...`, and it keeps each person's conversation context separate.
+This project is a shared chat room with an AI teammate inside it.
+
+Two people can join the same room, talk at the same time, and both can ask the same agent.
+The important part is that the agent should still answer the right person with the right context.
+
+In simple words:
+
+- the room is shared
+- the agent memory is not shared
+
+That is the main idea of this assignment.
+
+---
+
+## What this app does
+
+1. Two users join with a name and a room code
+2. They can chat live in the same room
+3. An AI agent sits in the room as a third participant
+4. The agent only replies when someone writes `@agent ...`
+5. Each user keeps a separate context for the agent
+6. Messages are saved so history can come back after restart
+
+This is a smaller version of a real team room problem:
+people talk in one place, but the AI should not mix their workstreams.
+
+---
 
 ## Stack
 
 - **Backend:** Python, FastAPI, WebSockets, SQLite
 - **Frontend:** React + TypeScript (Vite)
-- **LLM:** Groq / OpenAI / Gemini (whichever key you put in `.env`)
+- **LLM:** Groq / OpenAI / Gemini
+  - use whichever key you already have
+  - put it in `.env`
+  - do not send your key to anyone
 
-## Why WebSockets
+---
 
-I picked WebSockets because both users need to see messages live, including agent typing state. Polling would work but feels laggy for a chat room. SSE is mostly server → client; with chat both directions matter, so WebSockets were the simplest full-duplex option for two users.
+## Why I chose WebSockets
+
+I needed live communication in both directions:
+
+- user sends a message
+- other user sees it immediately
+- agent typing state appears
+- agent reply appears
+
+For only two users, WebSockets were the simplest option that felt like a real chat room.
+
+Why not the other options:
+
+- **Polling:** works, but feels laggy for chat
+- **SSE:** mostly server to client, while chat needs both directions
+- **Heavy multiplayer setup:** not needed for this assignment
+
+The brief said we do not need a scalable multiplayer server.
+So I kept the transport simple on purpose.
+
+---
+
+## Setup
+
+### 1. Backend
+
+```bash
+cd backend
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Mac/Linux
+source venv/bin/activate
+
+pip install -r requirements.txt
+copy .env.example .env
+# Mac/Linux:
+# cp .env.example .env
 
 ## Setup
 
