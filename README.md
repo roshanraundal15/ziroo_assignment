@@ -1,16 +1,65 @@
 # Ziroo Assignment — Multiplayer Room with an AI Participant
 
-Shared chat room where two people can talk at the same time, and an AI agent sits in the room as a third participant. The agent only replies when someone writes `@agent ...`, and it keeps each person's conversation context separate.
+This project is a shared chat room with an AI teammate inside it.
+
+Two people can join the same room, talk at the same time, and both can ask the same agent.
+The important part is that the agent should still answer the right person with the right context.
+
+In simple words:
+
+- the room is shared
+- the agent memory is not shared
+
+That is the main idea of this assignment.
+
+---
+
+## What this app does
+
+1. Two users join with a name and a room code
+2. They can chat live in the same room
+3. An AI agent sits in the room as a third participant
+4. The agent only replies when someone writes `@agent ...`
+5. Each user keeps a separate context for the agent
+6. Messages are saved so history can come back after restart
+
+This is a smaller version of a real team room problem:
+people talk in one place, but the AI should not mix their workstreams.
+
+---
 
 ## Stack
 
 - **Backend:** Python, FastAPI, WebSockets, SQLite
 - **Frontend:** React + TypeScript (Vite)
-- **LLM:** Groq / OpenAI / Gemini (whichever key you put in `.env`)
+- **LLM:** Groq / OpenAI / Gemini
+  - use whichever key you already have
+  - put it in `.env`
+  - do not send your key to anyone
 
-## Why WebSockets
+---
 
-I picked WebSockets because both users need to see messages live, including agent typing state. Polling would work but feels laggy for a chat room. SSE is mostly server → client; with chat both directions matter, so WebSockets were the simplest full-duplex option for two users.
+## Why I chose WebSockets
+
+I needed live communication in both directions:
+
+- user sends a message
+- other user sees it immediately
+- agent typing state appears
+- agent reply appears
+
+For only two users, WebSockets were the simplest option that felt like a real chat room.
+
+Why not the other options:
+
+- **Polling:** works, but feels laggy for chat
+- **SSE:** mostly server to client, while chat needs both directions
+- **Heavy multiplayer setup:** not needed for this assignment
+
+The brief said we do not need a scalable multiplayer server.
+So I kept the transport simple on purpose.
+
+---
 
 ## Setup
 
@@ -27,91 +76,178 @@ venv\Scripts\activate
 source venv/bin/activate
 
 pip install -r requirements.txt
-copy .env.example .env   # Windows
-# cp .env.example .env   # Mac/Linux
-```
+copy .env.example .env
+# Mac/Linux:
+# cp .env.example .env
 
-Edit `backend/.env` and add **one** key:
-
-```
-GROQ_API_KEY=your_key_here
-```
-
-(or `OPENAI_API_KEY` / `GEMINI_API_KEY`)
-
-Run:
-
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-### 2. Frontend
-
-```bash
-cd frontend
+Open backend/.env and add one key:
+BashGROQ_API_KEY=your_key_here
+You can also use:
+BashOPENAI_API_KEY=your_key_here
+or
+BashGEMINI_API_KEY=your_key_here
+Then run:
+Bashuvicorn main:app --reload --port 8000
+2. Frontend
+Bashcd frontend
 npm install
 npm run dev
-```
+Open:
+texthttp://127.0.0.1:5173
+By default, the frontend uses the Vite /ws proxy to talk to the backend.
+If your WebSocket server is somewhere else, you can set:
+BashVITE_WS_URL=ws://127.0.0.1:8000/ws
+The room code is appended to that URL.
 
-Open http://127.0.0.1:5173
+How to test with two users
+This is the main way to check the assignment.
 
-The frontend uses the Vite `/ws` proxy by default. Set `VITE_WS_URL` when the WebSocket server lives elsewhere; the room code is appended to that URL.
+Open the app in two browser tabs
+Use the same room code in both, for example demo
+Use different names
+Chat normally first
+In tab A write:text@agent summarize what we talked about
+In tab B write:text@agent what should I do next?
 
-### 3. Test with two users
+What should happen:
 
-1. Open the app in **two browser tabs**
-2. Same room code in both (example: `demo`)
-3. Different names
-4. Chat normally
-5. In tab A: `@agent summarize what we talked about`
-6. In tab B, quickly: `@agent what should I do next?`
+both users see each other’s normal chat
+each @agent question gets its own reply
+A’s answer should stay based on A’s context
+B’s answer should stay based on B’s context
+A’s details should not leak into B’s answer
 
-You should see two separate agent answers. A’s context should not leak into B’s reply.
+That isolation test is the core of the assignment.
 
-## How context isolation works
+How context isolation works
+This is the most important design choice in the project.
+Shared room
+Every human message is saved to the shared room.
+That means both users can see the full conversation.
+Private agent memory
+Separately, each message is also stored in a per-user agent memory.
+That memory is keyed by:
+text(room_id, user_id)
+When someone asks the agent
+If User A writes @agent ...:
 
-- Every human message is saved to the **shared room** (everyone can see it)
-- Separately, each message is also appended to a **per-user agent memory** keyed by `(room_id, user_id)`
-- When user A triggers `@agent`, the LLM prompt is built **only** from A’s memory
-- User B’s messages are never included in A’s prompt
-- The agent reply is broadcast to the room, tagged as “replying to A”, and stored back into A’s memory so follow-ups work
+the system takes only User A’s memory
+builds the prompt from that memory
+calls the model once
+posts the reply in the shared room
+marks the reply as “replying to A”
+saves that reply back into A’s memory for follow-up questions
 
-This is the main thing the assignment is testing.
+User B’s messages are not added to User A’s prompt.
+Why this design:
+the room can stay open and shared,
+but the agent still treats each person as a separate thread.
 
-## Persistence
+Persistence
+Messages are stored in SQLite:
+textbackend/rooms.db
+Why SQLite:
 
-Messages are stored in SQLite (`backend/rooms.db`). If you restart the server and rejoin the same room code, history comes back.
+simple setup
+no extra service
+good enough for local demo
+history survives a server restart
 
-## Environment variables
+If you restart the backend and join the same room code again, the previous messages should load back.
+I did not move to Postgres for this assignment because the goal was a working local system, not production infrastructure.
 
-Never commit real keys. Use `backend/.env` locally.
+Environment variables
+Never commit real keys.
+Use backend/.env only on your machine.
 
-| Variable | Purpose |
-|---|---|
-| `GROQ_API_KEY` | Groq chat API |
-| `OPENAI_API_KEY` | OpenAI chat API |
-| `GEMINI_API_KEY` | Google Gemini |
-| `LLM_PROVIDER` | Optional force: `groq` / `openai` / `gemini` |
 
-If no key is set, the agent still responds with a clear mock message so the room UI stays testable.
 
-## Project layout
 
-```
-backend/
-  main.py      # WebSocket room + agent orchestration
-  llm.py       # one LLM call, timeouts, error strings
-  db.py        # SQLite save/load
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+VariablePurposeGROQ_API_KEYGroq chat APIOPENAI_API_KEYOpenAI chat APIGEMINI_API_KEYGoogle GeminiLLM_PROVIDEROptional force: groq / openai / gemini
+If no key is set, the agent still replies with a clear mock message.
+That way the UI and room flow can still be tested without a live model key.
+
+Project layout
+textbackend/
+  main.py            # room + websocket + agent flow
+  llm.py             # one model call, timeout and error handling
+  db.py              # sqlite save/load
   requirements.txt
   .env.example
+
 frontend/
-  src/App.tsx  # protocol-preserving room state
-  src/components/  # join, room header, messages, composer
+  src/App.tsx
+  src/components/    # join screen, header, messages, composer
   src/styles.css
+
 README.md
 NOTES.md
-```
 
-## Timebox note
+Design choices in short
+1. One model call only
+I call the model only when a message starts with @agent.
+No call on every keystroke.
+No multi-step pipeline.
+Reason:
+the brief said keep the AI call cheap and judge the system around the call, not the quality of the model answer.
+2. Concurrent users
+Both users can type at the same time.
+Chat is not blocked by a slow model call.
+Agent work runs in the background.
+Reason:
+a shared room should still feel live even when the agent is thinking.
+3. Failure handling
+If the model is slow, fails, or is missing:
 
-Built to stay inside a ~5–6 hour scope: working room, live messages, agent participant, isolation, persistence, and a usable UI. See `NOTES.md` for tradeoffs and what I would improve next.
+the room does not crash
+the agent posts a clear message
+the other user can keep chatting
+
+Reason:
+real systems fail, so the room should degrade safely.
+4. Simple persistence
+SQLite for message history.
+Enough for this assignment.
+Reason:
+easy to run, easy to understand, and restart-safe.
+
+Timebox note
+I built this to stay inside a 5 to 6 hour scope.
+What I focused on:
+
+context isolation
+live shared room
+safe agent calls
+clear UI states
+simple local setup
+
+What I did not overbuild:
+
+auth
+multi-server scaling
+complex agent tools
+heavy infrastructure
+
+Those can be useful later, but they were not the main test of this assignment.
+For more detail on what I tested, what I assumed, and what I would improve next, see NOTES.md.
