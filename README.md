@@ -1,232 +1,117 @@
-# Build Assignment — Multiplayer Room with an Automated Participant
+# Ziroo Assignment — Multiplayer Room with an AI Participant
 
-Role: Full Stack Engineering Intern  
-Timebox: 5–6 hours (don't exceed this; it's better to cut scope than rush features)
+Shared chat room where two people can talk at the same time, and an AI agent sits in the room as a third participant. The agent only replies when someone writes `@agent ...`, and it keeps each person's conversation context separate.
 
-Goal (plain): Build a simple chat room where two people can talk at the same time and there is an automated participant in the room that answers when addressed. The important rule: when the automated participant replies, it only sees the conversation history of the user who addressed it—not the other user's messages.
+## Stack
 
-## What to build
-- A shared chat room. Two people join with a name and a room code and see each other's messages live.
-- An automated participant that only replies when a message begins with something like `@agent ...`.
-- Per-user context. The automated participant must keep each user's context separate so one user's history never affects the other's replies.
-- Basic persistence so messages and room state survive a server restart (or document clearly why you didn't persist).
-- A simple, usable UI: message list, identity for each user, clear visual difference for automated messages, a "typing" or loading indicator while the automated participant is preparing a reply.
+- **Backend:** Python, FastAPI, WebSockets, SQLite
+- **Frontend:** React + TypeScript (Vite)
+- **LLM:** Groq / OpenAI / Gemini (whichever key you put in `.env`)
 
-## Minimum technical stack
-- Backend: Python + FastAPI + WebSockets
-- Frontend: React + TypeScript (Vite)
-- Data store: SQLite (simple, local persistence)
+## Why WebSockets
 
-## How it should behave (example)
-1. Open two browser tabs, join the same room code with different names.
-2. Both users type messages and see each other's messages immediately.
-3. If Tab A sends `@agent summarize what we talked about`, the automated participant replies using only Tab A's conversation history.
-4. If Tab B also asks `@agent ...`, the reply for B uses only B's history. No details from A should appear in B's reply.
+I picked WebSockets because both users need to see messages live, including agent typing state. Polling would work but feels laggy for a chat room. SSE is mostly server → client; with chat both directions matter, so WebSockets were the simplest full-duplex option for two users.
 
-## Design notes (what you should defend in the README / NOTES.md)
-- Why you picked your transport (WebSockets, SSE, or polling). For two users, pick the simplest that works and explain why.
-- How you stored room and per-user memory (what's persisted, keys used, data model).
-- How you avoid cross-talk between users (how you build the input for the automated participant so each user stays isolated).
-- How you handle concurrency, message ordering, and race conditions (briefly describe any locking, queuing, or timestamp rules).
-- How you handle service failures, timeouts, and bad responses — the room must keep working even if a call fails.
+## Setup
 
-## Constraints and expectations
-- One call to the external service per addressed message (not on every keystroke).
-- Keep the design simple and reliable for two concurrent users — you don't need production-scale multiplayer.
-- The app should degrade gracefully if the automated participant is slow or fails (show an error message in the room, keep chat working).
-- Two browser tabs are enough to demonstrate correctness — no real authentication needed.
+### 1. Backend
 
-## What reviewers will evaluate (in order)
-1. Does the automated participant keep two users' context separate? This is the main test.
-2. Backend design: how you modeled rooms/sessions, concurrency choices, and persistence.
-3. Integration safety: do you handle slow, malformed, or failed replies defensively?
-4. Frontend: interaction states and overall UX (typing state, clear identities, visual separation).
-5. Honesty in NOTES.md: what you tested, what you assumed, and what you'd improve with more time.
-
-## Practical notes
-- Use whichever external service/key you already have access to and document how to set the key in `.env`.
-- Keep calls small during development — a handful of test messages is enough.
-- Include a NOTES.md with tradeoffs, tests performed, and next steps.
-- The app should run locally with documented setup steps for backend and frontend.
-
-## Submission
-- A working repository (or zip) with frontend + backend and setup instructions.
-- README with how to run locally and a NOTES.md describing what you tested and what you'd improve.
-
----
-
-# Installation & Setup Guide
-
-## Prerequisites
-- **Python** 3.9 or higher
-- **Node.js** 16.x or higher and **npm** (or yarn)
-- **SQLite3** (usually pre-installed on macOS/Linux)
-- **Git**
-
-## Backend Setup
-
-### 1. Clone the repository
 ```bash
-git clone https://github.com/roshanraundal15/ziroo_assignment.git
-cd ziroo_assignment
-```
-
-### 2. Create a virtual environment (Python)
-```bash
-# macOS / Linux
-python3 -m venv venv
-source venv/bin/activate
+cd backend
+python -m venv venv
 
 # Windows
-python -m venv venv
 venv\Scripts\activate
-```
 
-### 3. Install Python dependencies
-```bash
+# Mac/Linux
+source venv/bin/activate
+
 pip install -r requirements.txt
+copy .env.example .env   # Windows
+# cp .env.example .env   # Mac/Linux
 ```
 
-### 4. Configure environment variables
-Create a `.env` file in the backend root directory:
+Edit `backend/.env` and add **one** key:
+
+```
+GROQ_API_KEY=your_key_here
+```
+
+(or `OPENAI_API_KEY` / `GEMINI_API_KEY`)
+
+Run:
+
 ```bash
-# .env
-OPENAI_API_KEY=your_api_key_here
-DATABASE_URL=sqlite:///./chat_rooms.db
-HOST=127.0.0.1
-PORT=8000
+uvicorn main:app --reload --port 8000
 ```
 
-Replace `your_api_key_here` with your actual API key (e.g., OpenAI, Anthropic, or similar).
+### 2. Frontend
 
-### 5. Initialize the database
-```bash
-python -m backend.db.init
-# Or if using Alembic for migrations:
-# alembic upgrade head
-```
-
-### 6. Start the backend server
-```bash
-uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-The backend will be running at `http://127.0.0.1:8000`. WebSocket endpoint: `ws://127.0.0.1:8000/ws`.
-
-## Frontend Setup
-
-### 1. Navigate to the frontend directory
 ```bash
 cd frontend
-```
-
-### 2. Install dependencies
-```bash
 npm install
-# or
-yarn install
-```
-
-### 3. Configure environment variables (if needed)
-Create a `.env` file in the `frontend/` directory:
-```bash
-# .env
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
-```
-
-### 4. Start the development server
-```bash
 npm run dev
-# or
-yarn dev
 ```
 
-The frontend will typically run at `http://localhost:5173` (Vite default).
+Open http://127.0.0.1:5173
 
-## Running Locally
+The frontend uses the Vite `/ws` proxy by default. Set `VITE_WS_URL` when the WebSocket server lives elsewhere; the room code is appended to that URL.
 
-1. **Start the backend** (in one terminal):
-   ```bash
-   source venv/bin/activate  # or activate on Windows
-   uvicorn backend.main:app --reload
-   ```
+### 3. Test with two users
 
-2. **Start the frontend** (in another terminal):
-   ```bash
-   cd frontend
-   npm run dev
-   ```
+1. Open the app in **two browser tabs**
+2. Same room code in both (example: `demo`)
+3. Different names
+4. Chat normally
+5. In tab A: `@agent summarize what we talked about`
+6. In tab B, quickly: `@agent what should I do next?`
 
-3. **Open two browser tabs**:
-   - Tab 1: `http://localhost:5173`
-   - Tab 2: `http://localhost:5173` (same URL)
+You should see two separate agent answers. A’s context should not leak into B’s reply.
 
-4. **Test the flow**:
-   - Enter the same room code in both tabs with different names
-   - Send messages and verify they appear in both tabs instantly
-   - Send `@agent <your question>` in one tab and check the response uses only that user's context
+## How context isolation works
 
-## Database
+- Every human message is saved to the **shared room** (everyone can see it)
+- Separately, each message is also appended to a **per-user agent memory** keyed by `(room_id, user_id)`
+- When user A triggers `@agent`, the LLM prompt is built **only** from A’s memory
+- User B’s messages are never included in A’s prompt
+- The agent reply is broadcast to the room, tagged as “replying to A”, and stored back into A’s memory so follow-ups work
 
-The SQLite database is created automatically at `./chat_rooms.db` (or the path specified in `DATABASE_URL`). It persists:
-- Rooms and room metadata
-- Messages with timestamps and user identifiers
-- Per-user conversation history
+This is the main thing the assignment is testing.
 
-To reset the database:
-```bash
-rm chat_rooms.db  # Delete the database file
-python -m backend.db.init  # Reinitialize
+## Persistence
+
+Messages are stored in SQLite (`backend/rooms.db`). If you restart the server and rejoin the same room code, history comes back.
+
+## Environment variables
+
+Never commit real keys. Use `backend/.env` locally.
+
+| Variable | Purpose |
+|---|---|
+| `GROQ_API_KEY` | Groq chat API |
+| `OPENAI_API_KEY` | OpenAI chat API |
+| `GEMINI_API_KEY` | Google Gemini |
+| `LLM_PROVIDER` | Optional force: `groq` / `openai` / `gemini` |
+
+If no key is set, the agent still responds with a clear mock message so the room UI stays testable.
+
+## Project layout
+
+```
+backend/
+  main.py      # WebSocket room + agent orchestration
+  llm.py       # one LLM call, timeouts, error strings
+  db.py        # SQLite save/load
+  requirements.txt
+  .env.example
+frontend/
+  src/App.tsx  # protocol-preserving room state
+  src/components/  # join, room header, messages, composer
+  src/styles.css
+README.md
+NOTES.md
 ```
 
-## Troubleshooting
+## Timebox note
 
-### Port already in use
-If port 8000 is already in use:
-```bash
-uvicorn backend.main:app --host 127.0.0.1 --port 8001 --reload
-# Update VITE_WS_URL in frontend/.env to ws://localhost:8001
-```
-
-### WebSocket connection fails
-- Ensure the backend is running and accessible at the configured URL
-- Check that CORS and WebSocket settings are properly configured in `backend/main.py`
-- Verify the frontend `.env` has the correct `VITE_WS_URL`
-
-### Missing dependencies
-```bash
-# Backend
-pip install --upgrade pip
-pip install -r requirements.txt
-
-# Frontend
-npm ci  # Clean install
-npm install
-```
-
-### Database issues
-```bash
-# Check database file exists
-ls -la chat_rooms.db  # macOS/Linux
-dir chat_rooms.db     # Windows
-
-# Reinitialize if corrupted
-rm chat_rooms.db
-python -m backend.db.init
-```
-
-## Development Tips
-
-- **Backend logs**: Check terminal output for WebSocket connection details and agent calls
-- **Frontend DevTools**: Use React DevTools and browser Network tab to debug WebSocket messages
-- **API Documentation**: Visit `http://localhost:8000/docs` for interactive Swagger documentation
-- **Database viewer**: Use `sqlite3 chat_rooms.db` or a GUI tool like DB Browser for SQLite
-
-## Production Deployment
-
-For production deployment, refer to `NOTES.md` for security considerations and recommended changes before deploying to a live environment.
-
----
-
-For detailed architecture, design decisions, and testing information, see **NOTES.md**.
+Built to stay inside a ~5–6 hour scope: working room, live messages, agent participant, isolation, persistence, and a usable UI. See `NOTES.md` for tradeoffs and what I would improve next.
