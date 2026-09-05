@@ -1,0 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+
+export function Composer({ onSend, queuedCount, disabled }: { onSend: (value: string) => void; queuedCount: number; disabled: boolean }) {
+  const [text, setText] = useState(""); const textareaRef = useRef<HTMLTextAreaElement>(null); const maxLength = 1000;
+  useEffect(() => { const element = textareaRef.current; if (element) { element.style.height = "auto"; element.style.height = `${Math.min(element.scrollHeight, 140)}px`; } }, [text]);
+  function send() { if (!text.trim()) return; onSend(text); setText(""); }
+  return <footer className="composer-wrap"><div className="composer-tools"><button className="shortcut-chip" onClick={() => setText((current) => current.startsWith("@agent ") ? current : `@agent ${current}`)}><span>✦</span> Ask agent</button><span className="composer-hint">Enter to send <b>·</b> Shift + Enter for new line</span>{queuedCount > 0 && <span className="queue-indicator">◌ {queuedCount} queued offline</span>}</div><div className="composer"><textarea ref={textareaRef} value={text} maxLength={maxLength} disabled={disabled} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); } }} placeholder="Write to the room..." rows={1} /><div className="composer-bottom"><span className={text.length > maxLength * .9 ? "counter warning" : "counter"}>{text.length} / {maxLength}</span><button className="send-button" onClick={send} disabled={!text.trim() || disabled} aria-label="Send message">Send <span>↗</span></button></div></div></footer>;
+}
