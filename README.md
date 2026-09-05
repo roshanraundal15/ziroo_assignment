@@ -162,6 +162,3 @@ README.md
 NOTES.md
 ```
 
-## Timebox note
-
-Built to stay inside a ~5–6 hour scope: working room, live messages, agent participant, isolation, persistence, and a usable UI. See `NOTES.md` for tradeoffs and what I would improve next.
